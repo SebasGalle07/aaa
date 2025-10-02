@@ -34,14 +34,30 @@ class ReservationRepository(SupabaseRepository):
             .eq("user_id", user_id)
             .order("start_date", desc=False)
         )
-        if offset:
-            query = query.range(offset, offset + limit - 1)
-        else:
-            query = query.limit(limit)
-        return query.execute()
+        return self._apply_pagination(query, limit, offset)
+
+    def listar_para_anfitrion(self, owner_id: str, *, limit: int = 20, offset: int = 0) -> Any:
+        query = (
+            self.table()
+            .select("*,vehicles!inner(owner_id)", count="exact")
+            .eq("vehicles.owner_id", owner_id)
+            .order("start_date", desc=False)
+        )
+        return self._apply_pagination(query, limit, offset)
+
+    def listar_todas(self, *, limit: int = 20, offset: int = 0) -> Any:
+        query = self.table().select("*", count="exact").order("start_date", desc=False)
+        return self._apply_pagination(query, limit, offset)
 
     def crear_reserva(self, payload: dict[str, Any]) -> Any:
         return self.table().insert(payload).execute()
 
     def cancelar_reserva(self, reserva_id: str) -> Any:
         return self.table().update({"status": "cancelada"}).eq("id", reserva_id).execute()
+
+    def _apply_pagination(self, query, limit: int, offset: int) -> Any:
+        if offset:
+            query = query.range(offset, offset + limit - 1)
+        else:
+            query = query.limit(limit)
+        return query.execute()

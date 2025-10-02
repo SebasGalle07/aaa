@@ -24,8 +24,9 @@ def listar_reservas():
     limit = min(max(int(request.args.get("limit", 20)), 1), 100)
     offset = max(int(request.args.get("offset", 0)), 0)
 
+    rol = str(usuario.get("rol", "cliente"))
     try:
-        resultado = reservation_service.listar_reservas(usuario["id"], limit=limit, offset=offset)
+        resultado = reservation_service.listar_reservas(usuario["id"], limit=limit, offset=offset, rol=rol)
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), HTTPStatus.SERVICE_UNAVAILABLE
 

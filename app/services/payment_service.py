@@ -37,7 +37,7 @@ class PaymentService:
         payload = {
             "reservation_id": reservation_id,
             "user_id": user_id,
-            "amount": str(amount.quantize(Decimal("0.01"))),
+            "amount": float(amount.quantize(Decimal("0.01"))),
             "currency": currency,
             "status": "pagado",
             "provider": metodo_pago.strip().lower() or "desconocido",

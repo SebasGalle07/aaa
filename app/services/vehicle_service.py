@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Capa de servicios que encapsula la logica de vehiculos y reservas."""
 
-from datetime import date
+from dataclasses import asdict as dataclass_asdict, is_dataclass\nfrom datetime import date
 from decimal import Decimal
 from typing import Iterable, List, Optional
 
@@ -98,12 +98,37 @@ class ReservationService:
         self._vehicle_repository = vehicle_repository or VehicleRepository()
         self._payment_service = payment_service or PaymentService(PaymentRepository())
 
-    def listar_reservas(self, user_id: str, *, limit: int = 20, offset: int = 0) -> dict[str, object]:
-        response = self._reservation_repository.listar_por_usuario(user_id, limit=limit, offset=offset)
+    def listar_reservas(
+        self,
+        user_id: str,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        rol: Optional[str] = None,
+    ) -> dict[str, object]:
+        rol_normalizado = (rol or "cliente").strip().lower()
+        if rol_normalizado == "administrador":
+            response = self._reservation_repository.listar_todas(limit=limit, offset=offset)
+        elif rol_normalizado == "anfitrion":
+            response = self._reservation_repository.listar_para_anfitrion(user_id, limit=limit, offset=offset)
+        else:
+            response = self._reservation_repository.listar_por_usuario(user_id, limit=limit, offset=offset)
+
         data = getattr(response, "data", None) or []
         total = getattr(response, "count", len(data)) or len(data)
+        items = []
+        for item in data:
+            if isinstance(item, dict):
+                item_dict = dict(item)
+            elif is_dataclass(item):
+                item_dict = dataclass_asdict(item)
+            else:
+                item_dict = dict(item)
+            item_dict.pop("vehicles", None)
+            items.append(self._convertir_a_modelo(item_dict))
+
         return {
-            "items": [self._convertir_a_modelo(item) for item in data],
+            "items": items,
             "total": total,
         }
 
@@ -201,6 +226,7 @@ class ReservationService:
             end_date=self._parse_date(registro.get("end_date")),
             status=str(registro.get("status")),
             created_at=registro.get("created_at"),
+            comentarios=registro.get("comentarios"),
         )
 
     @staticmethod
@@ -208,3 +234,5 @@ class ReservationService:
         if isinstance(value, date):
             return value
         return date.fromisoformat(str(value))
+
+

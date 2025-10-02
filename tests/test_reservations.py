@@ -31,7 +31,7 @@ def test_listar_reservas_exitoso(monkeypatch, test_client, mock_auth):
     from app.api import reservations as reservations_module
 
     class ServicioStub:
-        def listar_reservas(self, user_id: str, limit: int, offset: int):
+        def listar_reservas(self, user_id: str, limit: int, offset: int, **kwargs):
             assert user_id == "usuario-1"
             assert limit == 20
             assert offset == 0

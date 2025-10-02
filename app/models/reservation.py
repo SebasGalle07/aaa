@@ -16,4 +16,4 @@ class Reservation:
     end_date: date
     status: str
     created_at: Optional[str] = None
-
+    comentarios: Optional[str] = None

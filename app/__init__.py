@@ -9,6 +9,7 @@ from flask import Flask
 from . import compat  # noqa: F401
 from .api import api_bp
 from .config import BaseConfig
+from .errors import register_error_handlers
 from .extensions import supabase_client
 
 warnings.filterwarnings(
@@ -34,6 +35,7 @@ def create_app(config_object: type[BaseConfig] = BaseConfig) -> Flask:
 
     configure_extensions(app)
     register_blueprints(app)
+    register_error_handlers(app)
 
     return app
 
