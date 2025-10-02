@@ -1,0 +1,170 @@
+{
+  "info": {
+    "name": "AutoShare Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/health",
+          "host": ["{{base_url}}"],
+          "path": ["api", "health"]
+        }
+      }
+    },
+    {
+      "name": "Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Usuario Demo\",\n  \"email\": \"demo+{{timestamp}}@example.com\",\n  \"password\": \"ContrasenaSegura1\",\n  \"rol\": \"cliente\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/register",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "register"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.environment.set('access_token', json.access_token);",
+              "pm.environment.set('user_id', json.id);"
+            ]
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": ["pm.environment.set('timestamp', Date.now());"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"demo+{{timestamp}}@example.com\",\n  \"password\": \"ContrasenaSegura1\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/login",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "login"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.environment.set('access_token', json.access_token);",
+              "pm.environment.set('user_id', json.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Vehicles",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/vehicles?ciudad=Bogota&tipo=suv",
+          "host": ["{{base_url}}"],
+          "path": ["api", "vehicles"],
+          "query": [
+            {"key": "ciudad", "value": "Bogota"},
+            {"key": "tipo", "value": "suv"}
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create Reservation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{access_token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"vehicle_id\": \"11111111-2222-4333-8444-555555555555\",\n  \"start_date\": \"2025-12-01\",\n  \"end_date\": \"2025-12-05\",\n  \"comentarios\": \"Reserva demo desde Postman\",\n  \"metodo_pago\": \"tarjeta\",\n  \"card_last4\": \"4242\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/reservations",
+          "host": ["{{base_url}}"],
+          "path": ["api", "reservations"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.environment.set('reservation_id', json.reserva.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Reservations",
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{access_token}}"}
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/reservations",
+          "host": ["{{base_url}}"],
+          "path": ["api", "reservations"]
+        }
+      }
+    },
+    {
+      "name": "Cancel Reservation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{access_token}}"}
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/reservations/{{reservation_id}}/cancel",
+          "host": ["{{base_url}}"],
+          "path": ["api", "reservations", "{{reservation_id}}", "cancel"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:5000"},
+    {"key": "timestamp", "value": ""},
+    {"key": "access_token", "value": ""},
+    {"key": "reservation_id", "value": ""}
+  ]
+}

@@ -1,0 +1,34 @@
+# Entornos y dependencias
+.venv/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.pdb
+
+# Archivos temporales / cache
+*.log
+*.tmp
+*.sqlite
+.DS_Store
+Thumbs.db
+
+# Herramientas y editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+
+# Cobertura / pruebas
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Salidas de compilacion
+build/
+dist/
+*.egg-info/
+
+# Otros
+*.log.json
