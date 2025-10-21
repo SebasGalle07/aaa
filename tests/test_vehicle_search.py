@@ -90,3 +90,68 @@ def test_list_vehicles_sin_fecha_fin(monkeypatch, test_client):
     response = test_client.get("/api/vehicles?fecha_inicio=2025-10-01")
     assert response.status_code == 400
     assert "fecha_fin" in response.get_json()["error"].lower()
+
+
+def test_vehicle_service_filtra_disponibilidad_con_paginacion():
+    from app.services.vehicle_service import VehicleService
+
+    class VehicleRepoStub:
+        def __init__(self):
+            self.last_call = {}
+
+        def search(self, **kwargs):
+            self.last_call = kwargs
+            data = [
+                {
+                    "id": "vehiculo-libre",
+                    "owner_id": "owner-1",
+                    "make": "Toyota",
+                    "model": "RAV4",
+                    "year": 2022,
+                    "vehicle_type": "suv",
+                    "price_per_day": 120.0,
+                    "currency": "USD",
+                    "description": "SUV amplia",
+                    "location": "Bogota",
+                    "capacity": 5,
+                    "created_at": "2025-01-01T00:00:00Z",
+                    "updated_at": "2025-01-01T00:00:00Z",
+                },
+                {
+                    "id": "vehiculo-ocupado",
+                    "owner_id": "owner-2",
+                    "make": "Ford",
+                    "model": "Ranger",
+                    "year": 2023,
+                    "vehicle_type": "pickup",
+                    "price_per_day": 150.0,
+                    "currency": "USD",
+                    "description": "Pickup 4x4",
+                    "location": "Bogota",
+                    "capacity": 5,
+                    "created_at": "2025-01-01T00:00:00Z",
+                    "updated_at": "2025-01-01T00:00:00Z",
+                },
+            ]
+            return type("Resp", (), {"data": data})()
+
+    class ReservationRepoStub:
+        def obtener_reservas_en_rango(self, vehicle_ids, fecha_inicio, fecha_fin):
+            data = [{"vehicle_id": "vehiculo-ocupado"}]
+            return type("Resp", (), {"data": data})()
+
+    repo_stub = VehicleRepoStub()
+    reservation_stub = ReservationRepoStub()
+    service = VehicleService(repository=repo_stub, reservation_repository=reservation_stub)
+
+    resultado = service.buscar_vehiculos(
+        fecha_inicio=date(2025, 10, 10),
+        fecha_fin=date(2025, 10, 12),
+        limit=1,
+        offset=0,
+    )
+
+    assert repo_stub.last_call["limit"] is None
+    assert resultado["total"] == 1
+    assert len(resultado["items"]) == 1
+    assert resultado["items"][0].id == "vehiculo-libre"

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 """Servicios relacionados con pagos simulados dentro de la plataforma."""
 
-from dataclasses import asdict
 from decimal import Decimal
 from uuid import uuid4
 from typing import Optional
@@ -28,11 +27,13 @@ class PaymentService:
         user_id: str,
         amount: Decimal,
         currency: str,
-        metodo_pago: str,
+        metodo_pago: Optional[str],
         card_last4: Optional[str] = None,
     ) -> Payment:
         if amount <= 0:
             raise PagoFallidoError("El monto a cobrar debe ser mayor que cero.")
+
+        provider = (metodo_pago or "").strip().lower() or "desconocido"
 
         payload = {
             "reservation_id": reservation_id,
@@ -40,7 +41,7 @@ class PaymentService:
             "amount": float(amount.quantize(Decimal("0.01"))),
             "currency": currency,
             "status": "pagado",
-            "provider": metodo_pago.strip().lower() or "desconocido",
+            "provider": provider,
             "reference": f"PAY-{uuid4().hex[:10].upper()}",
             "card_last4": card_last4,
         }

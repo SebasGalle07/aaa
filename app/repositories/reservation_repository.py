@@ -27,6 +27,30 @@ class ReservationRepository(SupabaseRepository):
         query = query.gte("end_date", fecha_inicio.isoformat())
         return query.execute()
 
+    def obtener_reservas_de_vehiculo(
+        self,
+        vehicle_id: str,
+        *,
+        desde: date | None = None,
+    ) -> Any:
+        query = (
+            self.table()
+            .select("id,vehicle_id,start_date,end_date,status")
+            .eq("vehicle_id", vehicle_id)
+            .order("start_date", desc=False)
+        )
+        if desde is not None:
+            query = query.gte("end_date", desde.isoformat())
+        return query.execute()
+
+    def obtener_por_id_con_vehiculo(self, reserva_id: str) -> Any:
+        return (
+            self.table()
+            .select("*,vehicles(*)")
+            .eq("id", reserva_id)
+            .execute()
+        )
+
     def listar_por_usuario(self, user_id: str, *, limit: int = 20, offset: int = 0) -> Any:
         query = (
             self.table()

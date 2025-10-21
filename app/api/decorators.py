@@ -38,7 +38,10 @@ def require_auth(func: F) -> F:
             return jsonify({"error": "Token sin identificador de usuario."}), 401
 
         user_repo = UserRepository()
-        usuario = user_repo.obtener_por_id(user_id)
+        try:
+            usuario = user_repo.obtener_por_id(user_id)
+        except RuntimeError as exc:
+            return jsonify({"error": str(exc)}), 503
         if usuario is None:
             return jsonify({"error": "Usuario no encontrado."}), 401
 

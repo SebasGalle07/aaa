@@ -8,12 +8,14 @@ from typing import Optional
 
 from flask import jsonify, request
 
-from app.services import VehicleService
+from app.api.decorators import require_auth, require_roles
+from app.services import ReservationService, VehicleService
 
 from . import api_bp
 
 
 vehicle_service = VehicleService()
+reservation_service = ReservationService()
 
 
 def _parse_positive_int(value: str | None, default: int) -> int:
@@ -40,6 +42,17 @@ def _parse_date(value: Optional[str]) -> Optional[date]:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError as exc:
         raise ValueError("Las fechas deben tener el formato AAAA-MM-DD.") from exc
+
+
+@api_bp.get("/vehicles/cities")
+def list_vehicle_cities():
+    """Obtener el catalogo de ciudades disponibles para filtros."""
+    try:
+        ciudades = vehicle_service.listar_ciudades()
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+    return jsonify({"items": ciudades})
 
 
 @api_bp.get("/vehicles")
@@ -108,3 +121,28 @@ def get_vehicle(vehicle_id: str):
         return jsonify({"error": "Vehiculo no encontrado"}), 404
 
     return jsonify(asdict(vehicle))
+
+
+@api_bp.get("/vehicles/<vehicle_id>/availability")
+@require_auth
+@require_roles("cliente", "anfitrion", "administrador")
+def get_vehicle_availability(vehicle_id: str):
+    """Obtener las reservas existentes de un vehiculo para validar disponibilidad."""
+    include_past = request.args.get("include_past", "").lower() in {"1", "true", "yes"}
+
+    try:
+        reservas = reservation_service.obtener_disponibilidad_vehiculo(
+            vehicle_id,
+            incluir_historial=include_past,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:  # pragma: no cover - propagacion generica
+        return jsonify({"error": str(exc)}), 503
+
+    return jsonify(
+        {
+            "vehicle_id": vehicle_id,
+            "reservations": reservas,
+        }
+    )

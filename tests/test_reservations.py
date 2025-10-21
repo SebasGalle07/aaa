@@ -78,6 +78,7 @@ def test_crear_reserva_exitoso(monkeypatch, test_client, mock_auth):
             assert kwargs["vehicle_id"] == "vehiculo-1"
             assert kwargs["start_date"] == "2025-12-01"
             assert kwargs["end_date"] == "2025-12-05"
+            assert kwargs["metodo_pago"] == "tarjeta"
             return {
                 "reserva": Reservation(
                     id="res-1",
@@ -114,7 +115,7 @@ def test_crear_reserva_exitoso(monkeypatch, test_client, mock_auth):
             "start_date": "2025-12-01",
             "end_date": "2025-12-05",
             "comentarios": "Viaje de trabajo",
-            "metodo_pago": "Tarjeta",
+            "metodo_pago": None,
             "card_last4": "4242",
         },
     )
@@ -195,6 +196,25 @@ def test_cancelar_reserva_error(monkeypatch, test_client, mock_auth):
 
     assert response.status_code == 400
     assert "cancelar" in response.get_json()["error"].lower()
+
+
+def test_reservations_supabase_no_configurada(monkeypatch, test_client):
+    from app.api import decorators as decorators_module
+
+    class RepoStub:
+        def obtener_por_id(self, user_id: str):
+            raise RuntimeError("Cliente de Supabase no inicializado. Verifica los valores de configuracion de Supabase.")
+
+    monkeypatch.setattr(decorators_module, "decode_token", lambda token: {"sub": "usuario-1"})
+    monkeypatch.setattr(decorators_module, "UserRepository", lambda: RepoStub())
+
+    response = test_client.get(
+        "/api/reservations",
+        headers={"Authorization": "Bearer token"},
+    )
+
+    assert response.status_code == 503
+    assert "supabase" in response.get_json()["error"].lower()
 
 
 

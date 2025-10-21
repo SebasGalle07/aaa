@@ -45,28 +45,51 @@ class VehicleService:
         limit: int = 20,
         offset: int = 0,
     ) -> dict[str, object]:
-        response = self._vehicle_repository.search(
-            ciudad=ciudad,
-            tipo=tipo,
-            precio_min=precio_min,
-            precio_max=precio_max,
-            limit=limit,
-            offset=offset,
-        )
+        requiere_disponibilidad = fecha_inicio is not None and fecha_fin is not None
+
+        if requiere_disponibilidad:
+            response = self._vehicle_repository.search(
+                ciudad=ciudad,
+                tipo=tipo,
+                precio_min=precio_min,
+                precio_max=precio_max,
+                limit=None,
+                offset=0,
+            )
+        else:
+            response = self._vehicle_repository.search(
+                ciudad=ciudad,
+                tipo=tipo,
+                precio_min=precio_min,
+                precio_max=precio_max,
+                limit=limit,
+                offset=offset,
+                include_count=True,
+            )
+
         data = getattr(response, "data", None) or []
-        total = getattr(response, "count", len(data)) or len(data)
         vehiculos = [Vehicle(**item) for item in data]
 
-        if fecha_inicio and fecha_fin and vehiculos:
-            vehiculos = self._filtrar_por_disponibilidad(vehiculos, fecha_inicio, fecha_fin)
-            total = len(vehiculos)
+        if requiere_disponibilidad and vehiculos:
+            vehiculos_disponibles = self._filtrar_por_disponibilidad(vehiculos, fecha_inicio, fecha_fin)
+            total = len(vehiculos_disponibles)
+            items = vehiculos_disponibles[offset : offset + limit]
+        else:
+            total = getattr(response, "count", len(vehiculos)) or len(vehiculos)
+            items = vehiculos
 
         return {
-            "items": vehiculos,
+            "items": items,
             "total": total,
             "limit": limit,
             "offset": offset,
         }
+
+    def listar_ciudades(self) -> List[str]:
+        try:
+            return self._vehicle_repository.listar_ciudades()
+        except Exception as exc:  # pragma: no cover - devuelve error generico
+            raise RuntimeError("No pudimos obtener el catalogo de ciudades.") from exc
 
     def _filtrar_por_disponibilidad(
         self,
@@ -217,6 +240,79 @@ class ReservationService:
         self._payment_service.marcar_reembolso(reserva_id)
         reserva["status"] = self.ESTADO_CANCELADA
         return self._convertir_a_modelo(reserva)
+
+    def obtener_disponibilidad_vehiculo(
+        self,
+        vehicle_id: str,
+        *,
+        incluir_historial: bool = False,
+    ) -> list[dict[str, object]]:
+        if not vehicle_id:
+            raise ValueError("Debes proporcionar el identificador del vehiculo.")
+
+        desde = None if incluir_historial else date.today()
+        respuesta = self._reservation_repository.obtener_reservas_de_vehiculo(vehicle_id, desde=desde)
+        data = getattr(respuesta, "data", None) or []
+
+        rangos: list[dict[str, object]] = []
+        for item in data:
+            if not isinstance(item, dict):
+                item = dict(item)
+            estado = str(item.get("status", "")).lower()
+            if estado == self.ESTADO_CANCELADA:
+                continue
+            inicio = self._parse_date(item.get("start_date"))
+            fin = self._parse_date(item.get("end_date"))
+            rangos.append(
+                {
+                    "id": str(item.get("id")),
+                    "start_date": inicio.isoformat(),
+                    "end_date": fin.isoformat(),
+                    "status": estado or self.ESTADO_CONFIRMADA,
+                }
+            )
+        return rangos
+
+    def obtener_reserva_detalle(
+        self,
+        reserva_id: str,
+        usuario_id: str,
+        *,
+        rol: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> dict[str, object]:
+        if not reserva_id:
+            raise ValueError("Debes proporcionar el identificador de la reserva.")
+
+        respuesta = self._reservation_repository.obtener_por_id_con_vehiculo(reserva_id)
+        data = getattr(respuesta, "data", None) or []
+        if not data:
+            raise ValueError("No se encontro la reserva solicitada.")
+
+        registro = data[0]
+        if not isinstance(registro, dict):
+            registro = dict(registro)
+
+        vehiculo_registro = registro.pop("vehicles", None)
+        rol_normalizado = (rol or "").strip().lower()
+        es_cliente = registro.get("user_id") == usuario_id
+        owner_id = None
+        if isinstance(vehiculo_registro, dict):
+            owner_id = vehiculo_registro.get("owner_id")
+        es_propietario = rol_normalizado == "anfitrion" and owner_id == usuario_id
+
+        if not (es_cliente or is_admin or es_propietario):
+            raise ValueError("No tienes permiso para consultar esta reserva.")
+
+        reserva_modelo = self._convertir_a_modelo(registro)
+        vehiculo_modelo = None
+        if isinstance(vehiculo_registro, dict):
+            vehiculo_modelo = Vehicle(**vehiculo_registro)
+
+        return {
+            "reserva": reserva_modelo,
+            "vehicle": vehiculo_modelo,
+        }
 
     def _convertir_a_modelo(self, registro: dict[str, object]) -> Reservation:
         return Reservation(

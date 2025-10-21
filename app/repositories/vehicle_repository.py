@@ -24,10 +24,14 @@ class VehicleRepository(SupabaseRepository):
         tipo: Optional[str] = None,
         precio_min: Optional[float] = None,
         precio_max: Optional[float] = None,
-        limit: int = 20,
+        limit: Optional[int] = 20,
         offset: int = 0,
+        include_count: bool = False,
     ) -> Any:
-        query = self.table().select("*")
+        if include_count:
+            query = self.table().select("*", count="exact")
+        else:
+            query = self.table().select("*")
         if ciudad:
             query = query.ilike("location", f"%{ciudad}%")
         if tipo:
@@ -37,10 +41,33 @@ class VehicleRepository(SupabaseRepository):
         if precio_max is not None:
             query = query.lte("price_per_day", precio_max)
 
-        query = query.order("price_per_day")
+        query = query.order("price_per_day") 
 
-        if offset:
-            query = query.range(offset, offset + limit - 1)
-        else:
-            query = query.limit(limit)
+        if limit is not None:
+            if offset:
+                query = query.range(offset, offset + limit - 1)
+            else:
+                query = query.limit(limit)
         return query.execute()
+
+    def listar_ciudades(self) -> list[str]:
+        response = self.table().select("location").execute()
+        data = getattr(response, "data", None) or []
+
+        ciudades: list[str] = []
+        vistos: set[str] = set()
+
+        for item in data:
+            valor = item.get("location")
+            if not isinstance(valor, str):
+                continue
+            ciudad = valor.strip()
+            if not ciudad:
+                continue
+            clave = ciudad.lower()
+            if clave in vistos:
+                continue
+            vistos.add(clave)
+            ciudades.append(ciudad)
+
+        return sorted(ciudades, key=lambda nombre: nombre.lower())
