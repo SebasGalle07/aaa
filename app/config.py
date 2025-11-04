@@ -28,7 +28,7 @@ class BaseConfig:
     SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
     SUPABASE_DB_URL = os.getenv(
         "SUPABASE_DB_URL",
-        "postgresql://postgres.aaghcbxleapvrknepntf:123456789@aws-1-us-east-2.pooler.supabase.com:6543/postgres",
+        "postgresql://postgres:SebasyLisa0809@db.xaanndbjgskguyaegygt.supabase.co:5432/postgres",
     )
 
     JWT_SECRET = os.getenv("JWT_SECRET") or SUPABASE_JWT_SECRET or "dev-secret-change-me"
