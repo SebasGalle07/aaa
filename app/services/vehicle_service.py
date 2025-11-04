@@ -447,7 +447,16 @@ class VehicleService:
             path = "/".join(["vehicles", vehicle_id, f"{indice:02d}_{nombre_aleatorio}.{extension}"])
             data = imagen["data"]
 
-            resultado = bucket.upload(path, data, file_options={"content-type": content_type, "upsert": True})
+            resultado = bucket.upload(
+                path,
+                data,  # asegúrate que sea bytes (en tu código ya lo es)
+                file_options={
+                    "content-type": str(content_type),  # ej: "image/jpeg"
+                    "x-upsert": "true",                 # <-- string, no bool
+                    # opcional: "cache-control": "public, max-age=3600"
+                },
+            )
+
             error = getattr(resultado, "error", None)
             if error is None and isinstance(resultado, dict):
                 error = resultado.get("error")
