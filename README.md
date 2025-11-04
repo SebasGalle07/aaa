@@ -1,96 +1,113 @@
-# AutoShare Backend
+# AutoShare
 
-Backend de alquiler de vehiculos estilo Airbnb construido con Flask y Supabase.
+Aplicacion estilo Airbnb para alquiler de vehiculos. Incluye backend Flask + Supabase y frontend Angular.
 
 ## Requisitos
 
-- Python 3.11 o superior
-- Cuenta y proyecto configurado en Supabase
-- pip (o pipenv/poetry si prefieres otro gestor)
+- Python 3.11+
+- Node.js 18+
+- Cuenta Supabase con el esquema de `migrations/`
 
-## Configuracion
+## Backend
 
-1. Crea y activa un entorno virtual de Python.
-2. Instala dependencias:
+### Configuracion local
+
+1. Crear y activar entorno virtual:
+   ```bash
+   python -m venv .venv
+   .\.venv\Scripts\activate
+   ```
+2. Instalar dependencias:
    ```bash
    pip install -r requirements.txt
    ```
-3. Crea un archivo `.env` en la raiz copiando `.env.example` y completa las variables (usa la Service Role Key para operaciones de escritura si la necesitas).
-   - `SUPABASE_DB_URL` ya apunta a la base academica compartida.
-   - Define `JWT_SECRET` para firmar los tokens (en desarrollo puedes dejar el valor por defecto, pero en produccion debe ser un secreto robusto y solo conocido por el backend).
-4. Ejecuta los scripts de `migrations/` en tu instancia de Supabase (puedes usar la consola SQL o `psql`).
-   - `001_create_users.sql`: crea la tabla `public.users`.
-   - `002_add_role_to_users.sql`: agrega la columna `rol` y valida los roles permitidos.
-   - `003_create_vehicles_and_reservations.sql`: crea `public.vehicles` y `public.reservations`, indices y datos de ejemplo.
-   - `004_create_payments.sql`: crea `public.payments` y deja dos pagos de ejemplo enlazados a las reservas seed.
-
-## Ejecucion de la app
-
-```bash
-flask --app wsgi --debug run
-```
-
-El blueprint principal expone los endpoints bajo `/api`.
-
-## Endpoints disponibles
-
-- `GET /api/health`: verifica el estado general del servicio y la configuracion de Supabase.
-- `POST /api/auth/register`: registra un nuevo usuario (`nombre`, `email`, `password`, `rol` opcional) y devuelve la informacion del usuario junto con un `access_token` JWT.
-- `POST /api/auth/login`: autentica a un usuario (email/contrasena) y entrega `access_token` + datos basicos.
-- `GET /api/vehicles`: busca vehiculos con filtros opcionales (`ciudad`, `tipo`, `precio_min`, `precio_max`, `fecha_inicio`, `fecha_fin`, `limit`, `offset`). La respuesta incluye metadata `{items, total, limit, offset}`.
-- `GET /api/vehicles/<vehicle_id>`: devuelve el detalle de un vehiculo especifico.
-- `GET /api/reservations`: **requiere `Authorization: Bearer <token>`**. Devuelve las reservas del usuario autenticado con metadata de paginacion.
-- `POST /api/reservations`: **requiere `Authorization: Bearer <token>`**. Crea una reserva (`vehicle_id`, `start_date`, `end_date`, `comentarios` opcional, `metodo_pago`, `card_last4`) y genera un pago asociado. Devuelve `{reserva, pago}`.
-- `POST /api/reservations/<reserva_id>/cancel`: **requiere `Authorization: Bearer <token>`**. Cancela una reserva confirmada del usuario autenticado (o cualquiera si el rol es `administrador`) y marca el pago como reembolsado.
-
-## Autenticacion con JWT
-
-1. Registra o inicia sesion para obtener el `access_token`.
-2. Incluye el token en los endpoints protegidos:
+3. Copiar `.env.example` a `.env` y completar credenciales (`SUPABASE_*`, `JWT_SECRET`, etc.).
+4. Ejecutar los scripts de `migrations/` en la base Supabase (`001` a `005`).
+5. Iniciar la API:
    ```bash
-   curl -H "Authorization: Bearer <token>" http://localhost:5000/api/reservations
+   flask --app wsgi --debug run
    ```
-3. La firma usa HS256 con el secreto definido en `JWT_SECRET`. Los tokens expiran despues de `JWT_ACCESS_TOKEN_EXPIRES_MIN` minutos (60 por defecto).
 
-## Roles soportados
+### Endpoints principales
 
-- `cliente`: usuarios que reservan vehiculos.
-- `anfitrion`: propietarios que publican vehiculos (por ahora comparten los mismos permisos que `cliente`).
-- `administrador`: acceso completo, puede cancelar cualquier reserva.
+- `POST /api/auth/register` / `POST /api/auth/login`
+- `GET /api/vehicles` y `GET /api/vehicles/<id>`
+- `POST /api/vehicles` **(admin)**: alta de vehiculos con multipart/form-data.
+- `GET /api/admin/vehicles` y `GET /api/admin/vehicles/<id>` **(admin)**.
+- `PATCH /api/vehicles/<id>/status` **(admin)**: publica o pausa un vehiculo.
+- `GET /api/reservations`
+- `POST /api/reservations`
+- `POST /api/reservations/<id>/cancel`
 
-## Datos de ejemplo
+Todas las rutas protegidas requieren encabezado `Authorization: Bearer <token>`.
 
-Usuarios:
-```sql
-insert into public.users (id, email, password_hash, nombre, rol) values
-    ('16347695-1452-407d-9a8d-0ba0a44a8bd9', 'laura@example.com', 'scrypt:32768:8:1$Tj873LouzIVSy0Vn$4cab5a3163e69fedc74a162a171c698ebf428e59874e8544582bc300bdd29bd7540d083d74a88115afc4c90b28d5a1d0857406a812fd831da1dab7464597e6df', 'Laura Gomez', 'cliente'),
-    ('f799e528-c155-4c18-9515-e7749fc0a136', 'carlos@example.com', 'scrypt:32768:8:1$ljbDIILfH8gusZnP$40d27995ee5058af99c2763605b2bc7b86abfbdfdad3ae832ffeb2e3f051b1426b5ed337f393e07bd5bdf10b8591707645bae20bb3f755c8613d2a1668732e57', 'Carlos Ruiz', 'anfitrion'),
-    ('058b432a-9b65-4dfd-bda0-aa3cc9fc81da', 'mariana@example.com', 'scrypt:32768:8:1$7ZCoI7kGXJfPfXPb$1c2ed3844340ef459f40b9e63c1e6126b98a9e6098f77704db1dcd907e56f3d3cbe25897d0b18d97434bc43007011107d4711e20e17b0c643c2303e9a1467ae1', 'Mariana Torres', 'cliente')
-on conflict (email) do nothing;
-```
+### Registro de vehiculos
 
-Vehiculos, reservas y pagos de ejemplo (ver migraciones 003 y 004) para contar con datos consistentes en todas las tablas.
+- Obligatorios: `license_plate`, `make`, `model`, `vehicle_type`, `year >= VEHICLE_MIN_YEAR`, `price_per_day`, `location`, `images` (JPG/PNG <= 3MB).
+- Estado inicial `INACTIVO` hasta validacion manual (`PATCH /api/vehicles/<id>/status`).
+- Auditoria: `created_by`, `validated_by`, `validated_at`.
+- Vehiculos inactivos no aparecen en el catalogo ni bloquean disponibilidad.
 
-Las contrasenas plano asociadas a los usuarios de ejemplo son `ContrasenaSegura1`, `ContrasenaSegura2` y `ContrasenaSegura3` respectivamente.
-
-## Tests
+### Tests backend
 
 ```bash
 pytest
 ```
 
-## Estructura
+## Frontend Angular
 
-- `app/`: codigo de la aplicacion y blueprints.
-- `app/security.py`: utilidades para firmar/verificar tokens JWT.
-- `app/api/`: endpoints HTTP (auth, vehicles, reservations).
-- `app/services/` y `app/repositories/`: capas de dominio listas para implementar historias.
-- `tests/`: pruebas unitarias y de integracion.
-- `migrations/`: scripts SQL para crear y actualizar el esquema en Supabase.
+### Desarrollo
 
-## Proximos pasos
+```bash
+cd front
+npm install
+npm start
+```
 
-- Implementar autorizacion granular por rol (endpoints exclusivos para anfitriones/administradores).
-- Añadir el flujo de publicacion/edicion de vehiculos por anfitriones.
-- Extender el ciclo de vida de reservas (completada, evaluacion, pagos reales, etc.).
-- Configurar politicas RLS en Supabase y pipeline de despliegue.
+Rutas principales:
+
+- `/home`, `/buscar`, `/reservar/:id` para clientes.
+- `/admin/vehicles` y `/admin/vehicles/nuevo` para administradores (detectado por rol en el JWT).
+
+El formulario de alta valida formato de placa, rango de ano, tipo/peso de imagenes y muestra previsualizaciones.
+
+### Build de produccion
+
+```bash
+npm run build
+```
+
+Salida: `front/dist/frontend`.
+
+## Datos seed
+
+`migrations/003_create_vehicles_and_reservations.sql` y `004_create_payments.sql` incluyen vehiculos, reservas y pagos de ejemplo. Las contrasenas planas demo son `ContrasenaSegura1/2/3`.
+
+## Despliegue en Render
+
+`render.yaml` define dos servicios:
+
+1. **autoshare-backend** (web Python)
+   - Build: `pip install -r requirements.txt`
+   - Start: `gunicorn --bind 0.0.0.0:$PORT wsgi:app`
+   - Completar en el panel las variables `SUPABASE_*`, `JWT_SECRET`, `VEHICLE_IMAGE_BUCKET`, etc.
+2. **autoshare-frontend** (static)
+   - Root: `front`
+   - Build: `npm install && npm run build`
+   - Publish: `dist/frontend`
+
+Para que la SPA enrute `/api/*` hacia el backend se usa `front/static.json`. Sustituye `YOUR-BACKEND-SERVICE.onrender.com` por la URL real del servicio Flask tras el primer despliegue.
+
+## Variables de entorno destacadas
+
+- `VEHICLE_MIN_YEAR` (default 2015)
+- `VEHICLE_IMAGE_MAX_MB` (default 3)
+- `VEHICLE_IMAGE_BUCKET`
+- `VEHICLE_DEFAULT_CURRENCY`
+
+## Notas
+
+- Las imagenes se almacenan en el bucket de Supabase Storage indicado.
+- El servicio de reservas ignora reservas canceladas al validar disponibilidad.
+- Hay pruebas unitarias para reservas y validaciones de vehiculos/imagenes.
+

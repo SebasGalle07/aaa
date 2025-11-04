@@ -60,8 +60,6 @@ create index if not exists reservations_user_idx on public.reservations (user_id
 create index if not exists reservations_vehicle_idx on public.reservations (vehicle_id);
 create index if not exists reservations_vehicle_dates_idx on public.reservations (vehicle_id, start_date, end_date);
 
--- Datos adicionales de ejemplo
-a
 insert into public.reservations (id, vehicle_id, user_id, start_date, end_date, status, comentarios)
 values
     ('cccc3333-dddd-4444-eeee-555555555555', '33333333-4444-5555-8666-777777777777', 'f799e528-c155-4c18-9515-e7749fc0a136', date '2025-11-01', date '2025-11-05', 'confirmada', 'Visita familiar')

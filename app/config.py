@@ -36,6 +36,10 @@ class BaseConfig:
     JWT_ACCESS_TOKEN_EXPIRES_MIN = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES_MIN", "60"))
 
     JSON_SORT_KEYS = False
+    VEHICLE_MIN_YEAR = int(os.getenv("VEHICLE_MIN_YEAR", "2015"))
+    VEHICLE_IMAGE_MAX_MB = float(os.getenv("VEHICLE_IMAGE_MAX_MB", "3"))
+    VEHICLE_IMAGE_BUCKET = os.getenv("VEHICLE_IMAGE_BUCKET", "vehicle-images")
+    VEHICLE_DEFAULT_CURRENCY = os.getenv("VEHICLE_DEFAULT_CURRENCY", "USD")
 
 
 class TestConfig(BaseConfig):

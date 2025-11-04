@@ -24,6 +24,7 @@ class VehicleRepository(SupabaseRepository):
         tipo: Optional[str] = None,
         precio_min: Optional[float] = None,
         precio_max: Optional[float] = None,
+        status: Optional[str] = "activo",
         limit: Optional[int] = 20,
         offset: int = 0,
         include_count: bool = False,
@@ -32,6 +33,7 @@ class VehicleRepository(SupabaseRepository):
             query = self.table().select("*", count="exact")
         else:
             query = self.table().select("*")
+
         if ciudad:
             query = query.ilike("location", f"%{ciudad}%")
         if tipo:
@@ -40,8 +42,10 @@ class VehicleRepository(SupabaseRepository):
             query = query.gte("price_per_day", precio_min)
         if precio_max is not None:
             query = query.lte("price_per_day", precio_max)
+        if status is not None:
+            query = query.eq("status", status)
 
-        query = query.order("price_per_day") 
+        query = query.order("price_per_day")
 
         if limit is not None:
             if offset:
@@ -71,3 +75,39 @@ class VehicleRepository(SupabaseRepository):
             ciudades.append(ciudad)
 
         return sorted(ciudades, key=lambda nombre: nombre.lower())
+
+    def crear_vehiculo(self, payload: dict[str, Any]) -> dict[str, Any]:
+        respuesta = self.table().insert(payload).execute()
+        return self._obtener_unico(respuesta, "registrar el vehiculo")
+
+    def actualizar_vehiculo(self, vehicle_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        respuesta = self.table().update(payload).eq("id", vehicle_id).execute()
+        return self._obtener_unico(respuesta, "actualizar el vehiculo")
+
+    def listar_admin(
+        self,
+        *,
+        status: Optional[str] = None,
+        ciudad: Optional[str] = None,
+        limit: Optional[int] = 20,
+        offset: int = 0,
+        include_count: bool = True,
+    ) -> Any:
+        return self.search(
+            status=status,
+            ciudad=ciudad,
+            limit=limit,
+            offset=offset,
+            include_count=include_count,
+        )
+
+    @staticmethod
+    def _obtener_unico(respuesta: Any, accion: str) -> dict[str, Any]:
+        error = getattr(respuesta, "error", None)
+        if error:
+            mensaje = error.get("message") if isinstance(error, dict) else str(error)
+            raise RuntimeError(f"No fue posible {accion}: {mensaje}")
+        datos = getattr(respuesta, "data", None) or []
+        if not datos:
+            raise RuntimeError(f"El servicio no devolvio informacion al {accion}.")
+        return dict(datos[0])

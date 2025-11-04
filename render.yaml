@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: autoshare-backend
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0: wsgi:app
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.7
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SUPABASE_SCHEMA
+        value: public
+      - key: JWT_SECRET
+        sync: false
+      - key: VEHICLE_MIN_YEAR
+        value: "2015"
+      - key: VEHICLE_IMAGE_BUCKET
+        value: vehicle-images
+  - type: web
+    name: autoshare-frontend
+    env: static
+    plan: free
+    rootDir: front
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist/frontend
+    autoDeploy: true

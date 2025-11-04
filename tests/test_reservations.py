@@ -198,6 +198,106 @@ def test_cancelar_reserva_error(monkeypatch, test_client, mock_auth):
     assert "cancelar" in response.get_json()["error"].lower()
 
 
+def test_reservation_service_rechaza_vehiculo_inactivo():
+    from app.services.reservation_service import ReservationService
+
+    class ReservationRepoStub:
+        def obtener_reservas_en_rango(self, vehicle_ids, fecha_inicio, fecha_fin):
+            return type("Resp", (), {"data": []})()
+
+        def crear_reserva(self, payload):
+            raise AssertionError("No deberia registrar reserva cuando el vehiculo esta inactivo.")
+
+    class VehicleRepoStub:
+        def get_by_id(self, vehicle_id: str):
+            return {
+                "id": vehicle_id,
+                "price_per_day": 100.0,
+                "currency": "USD",
+                "status": "inactivo",
+            }
+
+    class PaymentStub:
+        def procesar_pago(self, **kwargs):
+            raise AssertionError("No deberia procesar pago cuando el vehiculo esta inactivo.")
+
+    service = ReservationService(
+        reservation_repository=ReservationRepoStub(),
+        vehicle_repository=VehicleRepoStub(),
+        payment_service=PaymentStub(),
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        service.crear_reserva(
+            usuario_id="user-1",
+            vehicle_id="veh-1",
+            start_date="2025-01-01",
+            end_date="2025-01-05",
+        )
+
+    assert "disponible" in str(excinfo.value).lower()
+
+
+def test_reservation_service_ignora_reservas_canceladas(monkeypatch):
+    from app.services.reservation_service import ReservationService
+    from app.models import Payment
+
+    class ReservationRepoStub:
+        def __init__(self):
+            self.inserted = None
+
+        def obtener_reservas_en_rango(self, vehicle_ids, fecha_inicio, fecha_fin):
+            return type("Resp", (), {"data": [{"vehicle_id": vehicle_ids[0], "status": "cancelada"}]})()
+
+        def crear_reserva(self, payload):
+            self.inserted = dict(payload)
+            data = dict(payload)
+            data["id"] = "res-123"
+            return type("Resp", (), {"data": [data]})()
+
+    class VehicleRepoStub:
+        def get_by_id(self, vehicle_id: str):
+            return {
+                "id": vehicle_id,
+                "price_per_day": 100.0,
+                "currency": "USD",
+                "status": "activo",
+            }
+
+    class PaymentStub:
+        def procesar_pago(self, **kwargs):
+            return Payment(
+                id="pay-1",
+                reservation_id="res-123",
+                user_id=kwargs["user_id"],
+                amount=kwargs["amount"],
+                currency=kwargs["currency"],
+                status="pagado",
+                provider="tarjeta",
+                reference="PAY-1",
+            )
+
+        def marcar_reembolso(self, reserva_id: str):
+            return None
+
+    repo_stub = ReservationRepoStub()
+    service = ReservationService(
+        reservation_repository=repo_stub,
+        vehicle_repository=VehicleRepoStub(),
+        payment_service=PaymentStub(),
+    )
+
+    resultado = service.crear_reserva(
+        usuario_id="user-1",
+        vehicle_id="veh-1",
+        start_date="2025-01-01",
+        end_date="2025-01-02",
+    )
+
+    assert resultado["reserva"].id == "res-123"
+    assert repo_stub.inserted is not None
+
+
 def test_reservations_supabase_no_configurada(monkeypatch, test_client):
     from app.api import decorators as decorators_module
 

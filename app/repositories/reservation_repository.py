@@ -21,10 +21,11 @@ class ReservationRepository(SupabaseRepository):
         if not ids:
             return []
 
-        query = self.table().select("vehicle_id,start_date,end_date")
+        query = self.table().select("vehicle_id,start_date,end_date,status")
         query = query.in_("vehicle_id", ids)
         query = query.lte("start_date", fecha_fin.isoformat())
         query = query.gte("end_date", fecha_inicio.isoformat())
+        query = query.neq("status", "cancelada")
         return query.execute()
 
     def obtener_reservas_de_vehiculo(

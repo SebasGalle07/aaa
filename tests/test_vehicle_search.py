@@ -101,6 +101,7 @@ def test_vehicle_service_filtra_disponibilidad_con_paginacion():
 
         def search(self, **kwargs):
             self.last_call = kwargs
+            assert kwargs.get("status") == "activo"
             data = [
                 {
                     "id": "vehiculo-libre",
@@ -116,6 +117,7 @@ def test_vehicle_service_filtra_disponibilidad_con_paginacion():
                     "capacity": 5,
                     "created_at": "2025-01-01T00:00:00Z",
                     "updated_at": "2025-01-01T00:00:00Z",
+                    "status": "activo",
                 },
                 {
                     "id": "vehiculo-ocupado",
@@ -131,6 +133,7 @@ def test_vehicle_service_filtra_disponibilidad_con_paginacion():
                     "capacity": 5,
                     "created_at": "2025-01-01T00:00:00Z",
                     "updated_at": "2025-01-01T00:00:00Z",
+                    "status": "activo",
                 },
             ]
             return type("Resp", (), {"data": data})()
