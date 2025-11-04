@@ -162,10 +162,15 @@ class VehicleService:
         rutas_subidas: list[str] = []
 
         try:
+            # Incluimos el id del creador en la subida de imágenes para que el path
+            # respete las políticas de RLS de Supabase. El atributo "created_by"
+            # puede estar ausente si no se proporcionó, por lo que pasamos None
+            # en ese caso.
             imagenes_registradas = self._subir_imagenes(
                 vehicle_id=vehicle_id,
                 imagenes=imagenes_preparadas,
                 bucket_name=bucket_name,
+                user_id=vehiculo_data.get("created_by"),
             )
             rutas_subidas = [imagen["path"] for imagen in imagenes_registradas]
 
@@ -428,6 +433,7 @@ class VehicleService:
         vehicle_id: str,
         imagenes: Sequence[dict[str, object]],
         bucket_name: str,
+        user_id: Optional[str] = None,
     ) -> list[dict[str, object]]:
         if not supabase_client.is_initialized:
             raise RuntimeError(
@@ -444,7 +450,25 @@ class VehicleService:
             extension = str(imagen["extension"])
             content_type = str(imagen["content_type"])
             nombre_aleatorio = uuid4().hex[:12]
-            path = "/".join(["vehicles", vehicle_id, f"{indice:02d}_{nombre_aleatorio}.{extension}"])
+            #
+            # Construir la ruta de almacenamiento respetando las politicas RLS de Supabase.
+            # Supabase por defecto suele aplicar una politica donde el nombre del objeto debe
+            # comenzar con el identificador del usuario autenticado (auth.uid()). Para cumplir
+            # con esta restriccion, incluimos el `user_id` como primer segmento del path
+            # siempre que se proporcione. Si no hay `user_id`, usamos solamente `vehicle_id`.
+            # La estructura resultante será: `<user_id>/vehicles/<vehicle_id>/<n>_<random>.<ext>`
+            # Esto garantiza que la primera carpeta del path corresponde al usuario creador.
+            root_segment = user_id or ""
+            path_segments = []
+            if root_segment:
+                path_segments.append(root_segment)
+            # Mantener la carpeta "vehicles" para organizar mejor los objetos
+            path_segments.extend([
+                "vehicles",
+                vehicle_id,
+                f"{indice:02d}_{nombre_aleatorio}.{extension}",
+            ])
+            path = "/".join(path_segments)
             data = imagen["data"]
 
             resultado = bucket.upload(
@@ -452,7 +476,7 @@ class VehicleService:
                 data,  # asegúrate que sea bytes (en tu código ya lo es)
                 file_options={
                     "content-type": str(content_type),  # ej: "image/jpeg"
-                    "x-upsert": "true",                 # <-- string, no bool
+                    "x-upsert": "true",
                     # opcional: "cache-control": "public, max-age=3600"
                 },
             )
